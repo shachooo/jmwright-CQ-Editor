@@ -24,11 +24,11 @@ jobs:
             bash
 
       - name: pip install packages
-        shell: bash --login {0}
+        shell: bash --login -e {0}  # -e を追加してエラー時に確実に止まるように修正
         run: |
           micromamba info
-          # エラー対策：不足しがちなパッケージをあらかじめ追加インストール
-          pip install runtype vtk ocp
+          # モジュール不足エラー対策
+          pip install runtype vtk
           pip install git+https://github.com/jdegenstein/jmwright-CQ-Editor
           pip install -vvv --pre git+https://github.com/cadquery/cadquery casadi typish "multimethod>=1.11,<2.0" "nlopt>=2.9.0,<3.0" typish
           pip install pyinstaller>=5.6
@@ -42,20 +42,21 @@ jobs:
           pip list
 
       - name: Run build
-        shell: bash --login {0}
+        shell: bash --login -e {0}
         run: |
           micromamba activate test
           micromamba info
-          BUILD_TYPE="${{ github.event.inputs.type }}"
-          pyinstaller pyinstaller_pip.spec ${BUILD_TYPE:-dir}
           
-          # 最終手段：Micromamba環境のDLLを、ビルドされたexeと同じフォルダにすべて強制コピーする
+          # エラーの原因だった余計な引数を削除し、純粋にspecファイルだけを実行する
+          pyinstaller pyinstaller_pip.spec
+          
+          # 実行時のOCP(DLL load failed)エラーを防ぐため、環境内の全DLLをアプリと同じ階層に強制コピー
           cp "$CONDA_PREFIX/Library/bin/"*.dll dist/CQ-editor/
           
           cp pyinstaller/CQ-editor.cmd dist/
 
-      - name: 7zip artifact (workaround for too many files during artifact upload)
-        shell: bash --login {0}
+      - name: 7zip artifact
+        shell: bash --login -e {0}
         run: 7z a release.zip ./dist/*
         
       - uses: actions/upload-artifact@v4

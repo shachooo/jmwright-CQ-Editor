@@ -22,29 +22,29 @@ elif sys.platform == 'darwin':
 elif sys.platform == 'win32':
     occt_dir = os.path.join(Path(sys.prefix), 'Library', 'share', 'opencascade')
     ocp_path = [(os.path.join(HOMEPATH, 'OCP', 'OCP.cp312-win_amd64.pyd'), '.')]
-
 datas1, binaries1, hiddenimports1 = collect_all('debugpy')
-datas_rt, binaries_rt, hiddenimports_rt = collect_all('runtype') # ← 追加
+datas_rt, binaries_rt, hiddenimports_rt = collect_all('runtype')
+datas_vtk, binaries_vtk, hiddenimports_vtk = collect_all('vtkmodules') # ← これを追加
 hiddenimports2 = collect_submodules('xmlrpc')
 
 a = Analysis(['run.py'],
              pathex=['.'],
-             binaries=ocp_path + binaries1 + binaries_rt, # ← 追加
+             binaries=ocp_path + binaries1 + binaries_rt + binaries_vtk, # ← binaries_vtk を追加
              datas=[(spyder_data, 'spyder'),
                     (cqw_path, 'cq_warehouse'),
                     (bdw_path, 'bd_warehouse'),
                     (b123d_path, 'build123d'),
                     (cq_path, 'cadquery')] +
-                    [(p, 'parso/python') for p in parso_grammar] + datas1 + datas_rt, # ← 追加
-             hiddenimports=['ipykernel.datapub', 'debugpy', 'vtkmodules', 'vtkmodules.all',
+                    [(p, 'parso/python') for p in parso_grammar] + datas1 + datas_rt + datas_vtk, # ← datas_vtk を追加
+             hiddenimports=['ipykernel.datapub', 'debugpy', 'xmlrpc',
                             'pyqtgraph.graphicsItems.ViewBox.axisCtrlTemplate_pyqt5',
                             'pyqtgraph.graphicsItems.PlotItem.plotConfigTemplate_pyqt5',
-                            'pyqtgraph.imageview.ImageViewTemplate_pyqt5', 'xmlrpc',
+                            'pyqtgraph.imageview.ImageViewTemplate_pyqt5',
                             'zmq.backend', 'cq_warehouse', 'cq_warehouse.bearing', 'cq_warehouse.chain',
                             'cq_warehouse.drafting', 'cq_warehouse.extensions', 'cq_warehouse.fastener',
                             'cq_warehouse.sprocket', 'cq_warehouse.thread', 'cq_gears', 'cq_cache',
                             'build123d', 'cqmore', 'bd_warehouse', 'bd_warehouse.pipe', 'bd_warehouse.flange',
-                            'bd_warehouse.thread', 'bd_warehouse.gears'] + hiddenimports1 + hiddenimports2 + hiddenimports_rt, # ← 'runtype'単体指定を消し、これを追加
+                            'bd_warehouse.thread', 'bd_warehouse.gears'] + hiddenimports1 + hiddenimports2 + hiddenimports_rt + hiddenimports_vtk, # ← hiddenimports_vtk を追加（元のリストにあった 'vtkmodules' 等の文字列は削除しても残しても構いません）
              hookspath=['pyinstaller/extrahooks/'],
              runtime_hooks=['pyinstaller/pyi_rth_occ.py',
                             'pyinstaller/pyi_rth_fontconfig.py'],

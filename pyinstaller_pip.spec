@@ -1,116 +1,64 @@
-# -*- mode: python -*-
+name: build-PIP-TAR
 
-import sys, site, os
-import glob  # ← これを追加
-from path import Path
-from PyInstaller.utils.hooks import collect_all, collect_submodules
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+    inputs:
+      type:
+        description: 'Whether to build a single file (onefile) or directory (dir) dist'
+        required: true
+        default: 'dir'
 
-block_cipher = None
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
 
-spyder_data = Path(site.getsitepackages()[-1]) / 'spyder'
-parso_grammar = (Path(site.getsitepackages()[-1]) / 'parso/python').glob('grammar*')
-cqw_path = Path(site.getsitepackages()[-1]) / 'cq_warehouse'
-bdw_path = Path(site.getsitepackages()[-1]) / 'bd_warehouse'
-b123d_path = Path(site.getsitepackages()[-1]) / 'build123d'
-cq_path = Path(site.getsitepackages()[-1]) / 'cadquery'
+      - uses: mamba-org/setup-micromamba@v1
+        with:
+          environment-name: test
+          environment-file: environment.yml
+          init-shell: >-
+            bash
 
-if sys.platform == 'linux':
-    occt_dir = os.path.join(Path(sys.prefix), 'share', 'opencascade')
-    ocp_path = [(os.path.join(HOMEPATH, 'OCP', 'OCP.cpython-312-x86_64-linux-gnu.so'), '.')]
-elif sys.platform == 'darwin':
-    occt_dir = os.path.join(Path(sys.prefix), 'share', 'opencascade')
-    ocp_path = [(os.path.join(HOMEPATH, 'OCP', 'OCP.cpython-312-darwin.so'), '.')]
-elif sys.platform == 'win32':
-    occt_dir = os.path.join(Path(sys.prefix), 'Library', 'share', 'opencascade')
-    ocp_path = [(os.path.join(HOMEPATH, 'OCP', 'OCP.cp312-win_amd64.pyd'), '.')]
+      - name: pip install packages
+        shell: bash --login {0}
+        run: |
+          micromamba info
+          # エラー対策：不足しがちなパッケージをあらかじめ追加インストール
+          pip install runtype vtk ocp
+          pip install git+https://github.com/jdegenstein/jmwright-CQ-Editor
+          pip install -vvv --pre git+https://github.com/cadquery/cadquery casadi typish "multimethod>=1.11,<2.0" "nlopt>=2.9.0,<3.0" typish
+          pip install pyinstaller>=5.6
+          pip install path
+          pip install git+https://github.com/gumyr/cq_warehouse.git#egg=cq_warehouse
+          pip install git+https://github.com/gumyr/bd_warehouse
+          pip install git+https://github.com/meadiode/cq_gears.git@main
+          pip install -e "git+https://github.com/CadQuery/cadquery-plugins.git#egg=cq_cache&subdirectory=plugins/cq_cache"
+          pip install git+https://github.com/gumyr/build123d
+          pip install git+https://github.com/JustinSDK/cqMore
+          pip list
 
-# === ここから置き換え ===
-datas_all = []
-binaries_all = []
-hiddenimports_all = []
+      - name: Run build
+        shell: bash --login {0}
+        run: |
+          micromamba activate test
+          micromamba info
+          BUILD_TYPE="${{ github.event.inputs.type }}"
+          pyinstaller pyinstaller_pip.spec ${BUILD_TYPE:-dir}
+          
+          # 最終手段：Micromamba環境のDLLを、ビルドされたexeと同じフォルダにすべて強制コピーする
+          cp "$CONDA_PREFIX/Library/bin/"*.dll dist/CQ-editor/
+          
+          cp pyinstaller/CQ-editor.cmd dist/
 
-# 抜け落ちやすくエラーの原因になるパッケージをここで一網打尽にします
-packages_to_collect = [
-    'debugpy', 'runtype', 'vtkmodules', 'OCP', 'cadquery', 'cq_editor',
-    'casadi', 'nlopt', 'typish', 'multimethod', 'nptyping'
-]
-
-for pkg in packages_to_collect:
-    try:
-        d, b, h = collect_all(pkg)
-        datas_all.extend(d)
-        binaries_all.extend(b)
-        hiddenimports_all.extend(h)
-    except Exception:
-        pass # 未インストールの場合はスキップ
-
-hiddenimports_xmlrpc = collect_submodules('xmlrpc')
-
-# ↓↓ ここにパス定義を1行追加 ↓↓
-env_bin_dir = os.path.join(sys.prefix, 'Library', 'bin')
-# Library\bin 内のすべての DLL を強制的にルート階層('.')に同梱する
-conda_dlls = [(f, '.') for f in glob.glob(os.path.join(env_bin_dir, '*.dll'))]
-a = Analysis(['run.py'],
-             pathex=['.', env_bin_dir],
-             binaries=ocp_path + binaries_all,
-             datas=[(spyder_data, 'spyder'),
-                    (cqw_path, 'cq_warehouse'),
-                    (bdw_path, 'bd_warehouse'),
-                    (b123d_path, 'build123d'),
-                    (cq_path, 'cadquery')] +
-                    [(p, 'parso/python') for p in parso_grammar] + datas_all,
-             hiddenimports=['ipykernel.datapub',
-                            'pyqtgraph.graphicsItems.ViewBox.axisCtrlTemplate_pyqt5',
-                            'pyqtgraph.graphicsItems.PlotItem.plotConfigTemplate_pyqt5',
-                            'pyqtgraph.imageview.ImageViewTemplate_pyqt5',
-                            'zmq.backend', 'cq_warehouse', 'cq_warehouse.bearing', 'cq_warehouse.chain',
-                            'cq_warehouse.drafting', 'cq_warehouse.extensions', 'cq_warehouse.fastener',
-                            'cq_warehouse.sprocket', 'cq_warehouse.thread', 'cq_gears', 'cq_cache',
-                            'build123d', 'cqmore', 'bd_warehouse', 'bd_warehouse.pipe', 'bd_warehouse.flange',
-                            'bd_warehouse.thread', 'bd_warehouse.gears'] + hiddenimports_all + hiddenimports_xmlrpc,
-             hookspath=['pyinstaller/extrahooks/'],
-             runtime_hooks=['pyinstaller/pyi_rth_occ.py',
-                            'pyinstaller/pyi_rth_fontconfig.py'],
-             excludes=['_tkinter'],
-             win_no_prefer_redirects=False,
-             win_private_assemblies=False,
-             cipher=block_cipher,
-             noarchive=False)
-# === ここまで置き換え ===
-
-# There is an issue that keeps the OpenSSL libraries from being copied to the output directory.
-# This should work if nothing else, but does not with GitHub Actions
-# if sys.platform == 'win32':
-#     from PyInstaller.depend.bindepend import getfullnameof
-#     rel_data_path = ['PyQt5', 'Qt', 'bin']
-#     a.datas += [
-#         (getfullnameof('libssl-1_1-x64.dll'), os.path.join(*rel_data_path), 'DATA'),
-#         (getfullnameof('libcrypto-1_1-x64.dll'), os.path.join(*rel_data_path), 'DATA'),
-#     ]
-
-
-pyz = PYZ(a.pure, a.zipped_data,
-             cipher=block_cipher)
-exe = EXE(pyz,
-          a.scripts,
-          [],
-          exclude_binaries=True,
-          name='CQ-editor',
-          debug=False,
-          bootloader_ignore_signals=False,
-          strip=False,
-          upx=True,
-          console=True,
-          icon='icons/cadquery_logo_dark.ico')
-
-exclude = ()
-#exclude = ('libGL','libEGL','libbsd')
-a.binaries = TOC([x for x in a.binaries if not x[0].startswith(exclude)])
-
-coll = COLLECT(exe,
-               a.binaries,
-               a.zipfiles,
-               a.datas,
-               strip=False,
-               upx=True,
-               name='CQ-editor')
+      - name: 7zip artifact (workaround for too many files during artifact upload)
+        shell: bash --login {0}
+        run: 7z a release.zip ./dist/*
+        
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CQ-editor-Windows
+          path: release.zip

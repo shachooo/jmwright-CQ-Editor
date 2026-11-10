@@ -24,17 +24,18 @@ elif sys.platform == 'win32':
     ocp_path = [(os.path.join(HOMEPATH, 'OCP', 'OCP.cp312-win_amd64.pyd'), '.')]
 
 datas1, binaries1, hiddenimports1 = collect_all('debugpy')
+datas_rt, binaries_rt, hiddenimports_rt = collect_all('runtype') # ← 追加
 hiddenimports2 = collect_submodules('xmlrpc')
 
 a = Analysis(['run.py'],
              pathex=['.'],
-             binaries=ocp_path + binaries1,
+             binaries=ocp_path + binaries1 + binaries_rt, # ← 追加
              datas=[(spyder_data, 'spyder'),
                     (cqw_path, 'cq_warehouse'),
                     (bdw_path, 'bd_warehouse'),
                     (b123d_path, 'build123d'),
                     (cq_path, 'cadquery')] +
-                    [(p, 'parso/python') for p in parso_grammar] + datas1,
+                    [(p, 'parso/python') for p in parso_grammar] + datas1 + datas_rt, # ← 追加
              hiddenimports=['ipykernel.datapub', 'debugpy', 'vtkmodules', 'vtkmodules.all',
                             'pyqtgraph.graphicsItems.ViewBox.axisCtrlTemplate_pyqt5',
                             'pyqtgraph.graphicsItems.PlotItem.plotConfigTemplate_pyqt5',
@@ -43,7 +44,7 @@ a = Analysis(['run.py'],
                             'cq_warehouse.drafting', 'cq_warehouse.extensions', 'cq_warehouse.fastener',
                             'cq_warehouse.sprocket', 'cq_warehouse.thread', 'cq_gears', 'cq_cache',
                             'build123d', 'cqmore', 'bd_warehouse', 'bd_warehouse.pipe', 'bd_warehouse.flange',
-                            'bd_warehouse.thread', 'bd_warehouse.gears','runtype',] + hiddenimports1 + hiddenimports2,
+                            'bd_warehouse.thread', 'bd_warehouse.gears'] + hiddenimports1 + hiddenimports2 + hiddenimports_rt, # ← 'runtype'単体指定を消し、これを追加
              hookspath=['pyinstaller/extrahooks/'],
              runtime_hooks=['pyinstaller/pyi_rth_occ.py',
                             'pyinstaller/pyi_rth_fontconfig.py'],

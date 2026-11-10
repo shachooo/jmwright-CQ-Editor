@@ -45,8 +45,11 @@ for pkg in packages_to_collect:
 
 hiddenimports_xmlrpc = collect_submodules('xmlrpc')
 
+# ↓↓ ここにパス定義を1行追加 ↓↓
+env_bin_dir = os.path.join(sys.prefix, 'Library', 'bin')
+
 a = Analysis(['run.py'],
-             pathex=['.'],
+             pathex=['.', env_bin_dir],
              binaries=ocp_path + binaries_all,
              datas=[(spyder_data, 'spyder'),
                     (cqw_path, 'cq_warehouse'),

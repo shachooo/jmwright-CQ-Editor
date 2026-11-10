@@ -20,10 +20,11 @@ jobs:
         init-shell: >-
             bash
     - name: pip install cadquery CQ-editor ... etc
-      shell: bash --login {0}
+      shell: bash --login -e {0}
       run: |
         micromamba info
-        pip install runtype vtk ocp
+        # 環境を壊す vtk と ocp は外し、不足モジュールの runtype だけを追加します
+        pip install runtype
         pip install git+https://github.com/jdegenstein/jmwright-CQ-Editor
         pip install -vvv --pre git+https://github.com/cadquery/cadquery casadi typish "multimethod>=1.11,<2.0" "nlopt>=2.9.0,<3.0" typish
         pip install pyinstaller>=5.6
@@ -36,15 +37,19 @@ jobs:
         pip install git+https://github.com/JustinSDK/cqMore
         pip list
     - name: Run build
-      shell: bash --login {0}
+      shell: bash --login -e {0}
       run: |
         micromamba activate test
         micromamba info
-        pyinstaller pyinstaller_pip.spec ${{ github.event.inputs.type }}
-        cp D:/a/jmwright-CQ-Editor/jmwright-CQ-Editor/pyinstaller/CQ-editor.cmd D:/a/jmwright-CQ-Editor/jmwright-CQ-Editor/dist/
+        # 引数エラーを防ぐため、デフォルト値を設定して渡します
+        BUILD_TYPE="${{ github.event.inputs.type }}"
+        pyinstaller pyinstaller_pip.spec ${BUILD_TYPE:-dir}
+        
+        # パスのハードコードを相対パスに修正します
+        cp pyinstaller/CQ-editor.cmd dist/
 
     - name: 7zip artifact (workaround for too many files during artifact upload)
-      shell: bash --login {0}
+      shell: bash --login -e {0}
       run: 7z a release.zip ./dist/*
       
     - uses: actions/upload-artifact@v4

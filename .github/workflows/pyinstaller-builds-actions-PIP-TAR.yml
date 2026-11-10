@@ -23,7 +23,7 @@ jobs:
       shell: bash --login {0}
       run: |
         micromamba info
-        pip install runtype vtk  # ← vtk を追記
+        pip install runtype vtk ocp
         pip install git+https://github.com/jdegenstein/jmwright-CQ-Editor
         pip install -vvv --pre git+https://github.com/cadquery/cadquery casadi typish "multimethod>=1.11,<2.0" "nlopt>=2.9.0,<3.0" typish
         pip install pyinstaller>=5.6

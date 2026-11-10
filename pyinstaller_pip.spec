@@ -22,21 +22,39 @@ elif sys.platform == 'darwin':
 elif sys.platform == 'win32':
     occt_dir = os.path.join(Path(sys.prefix), 'Library', 'share', 'opencascade')
     ocp_path = [(os.path.join(HOMEPATH, 'OCP', 'OCP.cp312-win_amd64.pyd'), '.')]
-datas1, binaries1, hiddenimports1 = collect_all('debugpy')
-datas_rt, binaries_rt, hiddenimports_rt = collect_all('runtype')
-datas_vtk, binaries_vtk, hiddenimports_vtk = collect_all('vtkmodules') # ← これを追加
-hiddenimports2 = collect_submodules('xmlrpc')
+
+# === ここから置き換え ===
+datas_all = []
+binaries_all = []
+hiddenimports_all = []
+
+# 抜け落ちやすくエラーの原因になるパッケージをここで一網打尽にします
+packages_to_collect = [
+    'debugpy', 'runtype', 'vtkmodules', 'OCP', 'cadquery', 'cq_editor',
+    'casadi', 'nlopt', 'typish', 'multimethod', 'nptyping'
+]
+
+for pkg in packages_to_collect:
+    try:
+        d, b, h = collect_all(pkg)
+        datas_all.extend(d)
+        binaries_all.extend(b)
+        hiddenimports_all.extend(h)
+    except Exception:
+        pass # 未インストールの場合はスキップ
+
+hiddenimports_xmlrpc = collect_submodules('xmlrpc')
 
 a = Analysis(['run.py'],
              pathex=['.'],
-             binaries=ocp_path + binaries1 + binaries_rt + binaries_vtk, # ← binaries_vtk を追加
+             binaries=ocp_path + binaries_all,
              datas=[(spyder_data, 'spyder'),
                     (cqw_path, 'cq_warehouse'),
                     (bdw_path, 'bd_warehouse'),
                     (b123d_path, 'build123d'),
                     (cq_path, 'cadquery')] +
-                    [(p, 'parso/python') for p in parso_grammar] + datas1 + datas_rt + datas_vtk, # ← datas_vtk を追加
-             hiddenimports=['ipykernel.datapub', 'debugpy', 'xmlrpc',
+                    [(p, 'parso/python') for p in parso_grammar] + datas_all,
+             hiddenimports=['ipykernel.datapub',
                             'pyqtgraph.graphicsItems.ViewBox.axisCtrlTemplate_pyqt5',
                             'pyqtgraph.graphicsItems.PlotItem.plotConfigTemplate_pyqt5',
                             'pyqtgraph.imageview.ImageViewTemplate_pyqt5',
@@ -44,7 +62,7 @@ a = Analysis(['run.py'],
                             'cq_warehouse.drafting', 'cq_warehouse.extensions', 'cq_warehouse.fastener',
                             'cq_warehouse.sprocket', 'cq_warehouse.thread', 'cq_gears', 'cq_cache',
                             'build123d', 'cqmore', 'bd_warehouse', 'bd_warehouse.pipe', 'bd_warehouse.flange',
-                            'bd_warehouse.thread', 'bd_warehouse.gears'] + hiddenimports1 + hiddenimports2 + hiddenimports_rt + hiddenimports_vtk, # ← hiddenimports_vtk を追加（元のリストにあった 'vtkmodules' 等の文字列は削除しても残しても構いません）
+                            'bd_warehouse.thread', 'bd_warehouse.gears'] + hiddenimports_all + hiddenimports_xmlrpc,
              hookspath=['pyinstaller/extrahooks/'],
              runtime_hooks=['pyinstaller/pyi_rth_occ.py',
                             'pyinstaller/pyi_rth_fontconfig.py'],
@@ -53,6 +71,7 @@ a = Analysis(['run.py'],
              win_private_assemblies=False,
              cipher=block_cipher,
              noarchive=False)
+# === ここまで置き換え ===
 
 # There is an issue that keeps the OpenSSL libraries from being copied to the output directory.
 # This should work if nothing else, but does not with GitHub Actions

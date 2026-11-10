@@ -1,6 +1,7 @@
 # -*- mode: python -*-
 
 import sys, site, os
+import glob  # ← これを追加
 from path import Path
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
@@ -47,7 +48,8 @@ hiddenimports_xmlrpc = collect_submodules('xmlrpc')
 
 # ↓↓ ここにパス定義を1行追加 ↓↓
 env_bin_dir = os.path.join(sys.prefix, 'Library', 'bin')
-
+# Library\bin 内のすべての DLL を強制的にルート階層('.')に同梱する
+conda_dlls = [(f, '.') for f in glob.glob(os.path.join(env_bin_dir, '*.dll'))]
 a = Analysis(['run.py'],
              pathex=['.', env_bin_dir],
              binaries=ocp_path + binaries_all,

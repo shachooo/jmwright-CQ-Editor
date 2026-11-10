@@ -24,11 +24,11 @@ jobs:
             bash
 
       - name: pip install packages
-        shell: bash --login -e {0}  # -e を追加してエラー時に確実に止まるように修正
+        shell: bash --login -e {0}
         run: |
           micromamba info
-          # モジュール不足エラー対策
-          pip install runtype vtk
+          # 環境破壊を防ぐため vtk は外し、純粋に足りない runtype だけを追加します
+          pip install runtype
           pip install git+https://github.com/jdegenstein/jmwright-CQ-Editor
           pip install -vvv --pre git+https://github.com/cadquery/cadquery casadi typish "multimethod>=1.11,<2.0" "nlopt>=2.9.0,<3.0" typish
           pip install pyinstaller>=5.6
@@ -45,13 +45,13 @@ jobs:
         shell: bash --login -e {0}
         run: |
           micromamba activate test
-          micromamba info
           
-          # エラーの原因だった余計な引数を削除し、純粋にspecファイルだけを実行する
-          pyinstaller pyinstaller_pip.spec
+          # ビルド実行（エラー回避のため元のコマンドライン引数を復活させます）
+          BUILD_TYPE="${{ github.event.inputs.type }}"
+          pyinstaller pyinstaller_pip.spec ${BUILD_TYPE:-dir}
           
-          # 実行時のOCP(DLL load failed)エラーを防ぐため、環境内の全DLLをアプリと同じ階層に強制コピー
-          cp "$CONDA_PREFIX/Library/bin/"*.dll dist/CQ-editor/
+          # 実行時のOCPエラー対策: Windowsのパス問題（\と/の違い）でエラーにならないよう find コマンドで確実にDLLを全コピーします
+          find "$CONDA_PREFIX/Library/bin" -maxdepth 1 -name "*.dll" -exec cp {} dist/CQ-editor/ \;
           
           cp pyinstaller/CQ-editor.cmd dist/
 
